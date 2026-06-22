@@ -147,6 +147,7 @@ function AcaoRdsTunnel {
     Write-Host "====================================================`n" -ForegroundColor $GREEN
 
     $profile = $PROFILES[$Ambiente]
+    $tmp = [System.IO.Path]::GetTempFileName()
     @{
         Target       = $bastionId
         DocumentName = "AWS-StartPortForwardingSessionToRemoteHost"
@@ -155,7 +156,9 @@ function AcaoRdsTunnel {
             portNumber      = @("$REMOTE_PORT")
             localPortNumber = @("$LOCAL_PORT")
         }
-    } | ConvertTo-Json -Compress -Depth 5 | aws ssm start-session --region us-east-1 --profile $profile --cli-input-json -
+    } | ConvertTo-Json -Depth 5 -Compress | Out-File $tmp -Encoding ASCII -NoNewline
+    aws ssm start-session --region us-east-1 --profile $profile --cli-input-json "file://$($tmp.Replace('\','/'))"
+    Remove-Item $tmp -Force -ErrorAction SilentlyContinue
 }
 
 function AcaoConsoleRds {
@@ -168,6 +171,7 @@ function AcaoConsoleRds {
     $profile = $PROFILES[$Ambiente]
     $job = Start-Job -ScriptBlock {
         param($id, $ep, $rport, $lport, $awsProfile)
+        $tmp = [System.IO.Path]::GetTempFileName()
         @{
             Target       = $id
             DocumentName = "AWS-StartPortForwardingSessionToRemoteHost"
@@ -176,7 +180,9 @@ function AcaoConsoleRds {
                 portNumber      = @("$rport")
                 localPortNumber = @("$lport")
             }
-        } | ConvertTo-Json -Compress -Depth 5 | aws ssm start-session --region us-east-1 --profile $awsProfile --cli-input-json -
+        } | ConvertTo-Json -Depth 5 -Compress | Out-File $tmp -Encoding ASCII -NoNewline
+        aws ssm start-session --region us-east-1 --profile $awsProfile --cli-input-json "file://$($tmp.Replace('\','/'))"
+        Remove-Item $tmp -Force -ErrorAction SilentlyContinue
     } -ArgumentList $bastionId, $rdsEndpoint, $REMOTE_PORT, $LOCAL_PORT, $profile
 
     Start-Sleep 2
