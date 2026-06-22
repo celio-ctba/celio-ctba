@@ -20,6 +20,14 @@ if (-not (Get-Command aws -ErrorAction SilentlyContinue)) {
     exit 1
 }
 
+if (-not (Get-Command session-manager-plugin -ErrorAction SilentlyContinue)) {
+    Write-Host "Session Manager Plugin nao encontrado." -ForegroundColor $RED
+    Write-Host "Baixe e instale manualmente:" -ForegroundColor $YELLOW
+    Write-Host "  https://s3.amazonaws.com/session-manager-downloads/plugin/latest/windows/SessionManagerPluginSetup.exe" -ForegroundColor $GREEN
+    Write-Host "`nApos instalar, feche e abra um novo terminal."
+    exit 1
+}
+
 $PROFILES = @{ "homol" = "sc-homol"; "prod" = "sc-prod" }
 $RDS_CLUSTERS = @{ "homol" = "sc-db-cluster-homol"; "prod" = "sc-db-cluster-prod" }
 $SSO_ROLE_NAME = "Developers"
@@ -127,7 +135,12 @@ function BuscarRdsEndpoint {
         --db-cluster-identifier $RDS_CLUSTERS[$Ambiente] `
         --query "DBClusters[0].Endpoint" --output text 2>$null
     if (-not $endpoint -or $endpoint -eq "None") {
-        $endpoint = Read-Host "Endpoint do RDS"
+        do {
+            $endpoint = Read-Host "Endpoint do RDS"
+            if (-not $endpoint) {
+                Write-Host "Endpoint nao pode estar vazio." -ForegroundColor $RED
+            }
+        } until ($endpoint)
     }
     return $endpoint
 }
@@ -147,6 +160,18 @@ function AcaoRdsTunnel {
     Write-Host "====================================================`n" -ForegroundColor $GREEN
 
     $profile = $PROFILES[$Ambiente]
+
+    # Verifica sessao SSO antes de executar (pode ter expirado durante o menu)
+    aws sts get-caller-identity --profile $profile 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "`nSessao SSO expirada. Reautenticando..." -ForegroundColor $YELLOW
+        aws sso login --profile $profile
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "Falha na autenticacao SSO." -ForegroundColor $RED
+            return
+        }
+    }
+
     $params = @{
         host            = @($rdsEndpoint)
         portNumber      = @("$REMOTE_PORT")
@@ -164,6 +189,18 @@ function AcaoConsoleRds {
     Write-Host "`nConectando shell no bastion..." -ForegroundColor $GREEN
 
     $profile = $PROFILES[$Ambiente]
+
+    # Verifica sessao SSO antes de executar (pode ter expirado durante o menu)
+    aws sts get-caller-identity --profile $profile 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "`nSessao SSO expirada. Reautenticando..." -ForegroundColor $YELLOW
+        aws sso login --profile $profile
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "Falha na autenticacao SSO." -ForegroundColor $RED
+            return
+        }
+    }
+
     $job = Start-Job -ScriptBlock {
         param($id, $ep, $rport, $lport, $awsProfile)
         $params = @{
