@@ -147,14 +147,16 @@ function AcaoRdsTunnel {
     Write-Host "====================================================`n" -ForegroundColor $GREEN
 
     $profile = $PROFILES[$Ambiente]
-    $params = @{
+    $paramsFile = New-TemporaryFile
+    @{
         host          = @($rdsEndpoint)
         portNumber    = @("$REMOTE_PORT")
         localPortNumber = @("$LOCAL_PORT")
-    } | ConvertTo-Json -Compress
+    } | ConvertTo-Json -Compress | Out-File -FilePath $paramsFile -Encoding ASCII -NoNewline
     aws ssm start-session --target $bastionId --region us-east-1 --profile $profile `
         --document-name AWS-StartPortForwardingSessionToRemoteHost `
-        --parameters $params
+        --parameters "file://$($paramsFile.FullName)"
+    Remove-Item $paramsFile -Force -ErrorAction SilentlyContinue
 }
 
 function AcaoConsoleRds {
@@ -167,14 +169,16 @@ function AcaoConsoleRds {
     $profile = $PROFILES[$Ambiente]
     $job = Start-Job -ScriptBlock {
         param($id, $ep, $rport, $lport, $awsProfile)
-        $jp = @{
+        $jpFile = New-TemporaryFile
+        @{
             host          = @($ep)
             portNumber    = @("$rport")
             localPortNumber = @("$lport")
-        } | ConvertTo-Json -Compress
+        } | ConvertTo-Json -Compress | Out-File -FilePath $jpFile -Encoding ASCII -NoNewline
         aws ssm start-session --target $id --region us-east-1 --profile $awsProfile `
             --document-name AWS-StartPortForwardingSessionToRemoteHost `
-            --parameters $jp
+            --parameters "file://$($jpFile.FullName)"
+        Remove-Item $jpFile -Force -ErrorAction SilentlyContinue
     } -ArgumentList $bastionId, $rdsEndpoint, $REMOTE_PORT, $LOCAL_PORT, $profile
 
     Start-Sleep 2
