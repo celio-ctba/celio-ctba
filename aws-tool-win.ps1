@@ -147,7 +147,10 @@ function AcaoRdsTunnel {
     Write-Host "====================================================`n" -ForegroundColor $GREEN
 
     $profile = $PROFILES[$Ambiente]
-    $params = '{"host":["' + $rdsEndpoint + '"],"portNumber":["' + $REMOTE_PORT + '"],"localPortNumber":["' + $LOCAL_PORT + '"]}'
+
+    # CORRECAO: JSON sem colchetes e com escape de aspas correto para o cmd/powershell chamar o binario da AWS
+    $params = '{\"host\":[\"' + $rdsEndpoint + '\"],\"portNumber\":[\"' + $REMOTE_PORT + '\"],\"localPortNumber\":[\"' + $LOCAL_PORT + '\"]}'
+
     aws ssm start-session --target $bastionId --region us-east-1 --profile $profile `
         --document-name AWS-StartPortForwardingSessionToRemoteHost `
         --parameters $params
@@ -163,7 +166,10 @@ function AcaoConsoleRds {
     $profile = $PROFILES[$Ambiente]
     $job = Start-Job -ScriptBlock {
         param($id, $ep, $rport, $lport, $awsProfile)
-        $jp = '{"host":["' + $ep + '"],"portNumber":["' + $rport + '"],"localPortNumber":["' + $lport + '"]}'
+
+        # CORRECAO: JSON com escape de aspas correto aplicado também dentro do Job em background
+        $jp = '{\"host\":[\"' + $ep + '\"],\"portNumber\":[\"' + $rport + '\"],\"localPortNumber\":[\"' + $lport + '\"]}'
+
         aws ssm start-session --target $id --region us-east-1 --profile $awsProfile `
             --document-name AWS-StartPortForwardingSessionToRemoteHost `
             --parameters $jp
