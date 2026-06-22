@@ -147,18 +147,13 @@ function AcaoRdsTunnel {
     Write-Host "====================================================`n" -ForegroundColor $GREEN
 
     $profile = $PROFILES[$Ambiente]
-    $tmp = [System.IO.Path]::GetTempFileName()
-    @{
-        Target       = $bastionId
-        DocumentName = "AWS-StartPortForwardingSessionToRemoteHost"
-        Parameters   = @{
-            host            = @($rdsEndpoint)
-            portNumber      = @("$REMOTE_PORT")
-            localPortNumber = @("$LOCAL_PORT")
-        }
-    } | ConvertTo-Json -Depth 5 -Compress | Out-File $tmp -Encoding ASCII -NoNewline
-    aws ssm start-session --region us-east-1 --profile $profile --cli-input-json "file://$($tmp.Replace('\','/'))"
-    Remove-Item $tmp -Force -ErrorAction SilentlyContinue
+    $params = @{
+        host            = @($rdsEndpoint)
+        portNumber      = @("$REMOTE_PORT")
+        localPortNumber = @("$LOCAL_PORT")
+    } | ConvertTo-Json -Depth 5 -Compress
+    $paramsEsc = $params -replace '"', '""'
+    cmd /c "aws ssm start-session --target $bastionId --region us-east-1 --profile $profile --document-name AWS-StartPortForwardingSessionToRemoteHost --parameters `"$paramsEsc`""
 }
 
 function AcaoConsoleRds {
@@ -171,18 +166,13 @@ function AcaoConsoleRds {
     $profile = $PROFILES[$Ambiente]
     $job = Start-Job -ScriptBlock {
         param($id, $ep, $rport, $lport, $awsProfile)
-        $tmp = [System.IO.Path]::GetTempFileName()
-        @{
-            Target       = $id
-            DocumentName = "AWS-StartPortForwardingSessionToRemoteHost"
-            Parameters   = @{
-                host            = @($ep)
-                portNumber      = @("$rport")
-                localPortNumber = @("$lport")
-            }
-        } | ConvertTo-Json -Depth 5 -Compress | Out-File $tmp -Encoding ASCII -NoNewline
-        aws ssm start-session --region us-east-1 --profile $awsProfile --cli-input-json "file://$($tmp.Replace('\','/'))"
-        Remove-Item $tmp -Force -ErrorAction SilentlyContinue
+        $params = @{
+            host            = @($ep)
+            portNumber      = @("$rport")
+            localPortNumber = @("$lport")
+        } | ConvertTo-Json -Depth 5 -Compress
+        $paramsEsc = $params -replace '"', '""'
+        cmd /c "aws ssm start-session --target $id --region us-east-1 --profile $awsProfile --document-name AWS-StartPortForwardingSessionToRemoteHost --parameters `"$paramsEsc`""
     } -ArgumentList $bastionId, $rdsEndpoint, $REMOTE_PORT, $LOCAL_PORT, $profile
 
     Start-Sleep 2
