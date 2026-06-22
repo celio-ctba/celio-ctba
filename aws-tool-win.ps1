@@ -155,7 +155,7 @@ function AcaoRdsTunnel {
             portNumber      = @("$REMOTE_PORT")
             localPortNumber = @("$LOCAL_PORT")
         }
-    } | ConvertTo-Json -Compress | aws ssm start-session --region us-east-1 --profile $profile --cli-input-json -
+    } | ConvertTo-Json -Compress -Depth 5 | aws ssm start-session --region us-east-1 --profile $profile --cli-input-json -
 }
 
 function AcaoConsoleRds {
@@ -176,7 +176,7 @@ function AcaoConsoleRds {
                 portNumber      = @("$rport")
                 localPortNumber = @("$lport")
             }
-        } | ConvertTo-Json -Compress | aws ssm start-session --region us-east-1 --profile $awsProfile --cli-input-json -
+        } | ConvertTo-Json -Compress -Depth 5 | aws ssm start-session --region us-east-1 --profile $awsProfile --cli-input-json -
     } -ArgumentList $bastionId, $rdsEndpoint, $REMOTE_PORT, $LOCAL_PORT, $profile
 
     Start-Sleep 2
